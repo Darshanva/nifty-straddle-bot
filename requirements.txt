@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+itsdangerous
+kiteconnect
+tenacity
+requests
+python-dotenv
