@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - NIFTY Straddle Bot</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="30">
+    <meta http-equiv="refresh" content="10">
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
-
 <nav class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
-    <div class="text-xl font-bold text-cyan-400">NIFTY Straddle Bot</div>
+    <div class="text-xl font-bold text-cyan-400">NIFTY Straddle Bot (PAPER)</div>
     <div class="flex items-center gap-4">
         <span class="text-sm text-gray-400">{{ now }}</span>
         <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">Logout</a>
@@ -31,22 +30,50 @@
             <p class="text-2xl font-bold text-green-400">₹ {{ "{:,.0f}".format(equity.net or 0) }}</p>
         </div>
         <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <h3 class="text-gray-400 text-sm mb-1">Used Margin</h3>
-            <p class="text-2xl font-bold text-yellow-400">₹ {{ "{:,.0f}".format(equity.utilised.debits if equity.utilised else 0) }}</p>
+            <h3 class="text-gray-400 text-sm mb-1">Bot State</h3>
+            <p class="text-2xl font-bold {% if bot.state == 'OPEN' %}text-green-400{% elif bot.state == 'CLOSED' %}text-red-400{% else %}text-yellow-400{% endif %}">
+                {{ bot.state }}
+            </p>
         </div>
         <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <h3 class="text-gray-400 text-sm mb-1">Bot Status</h3>
-            <p class="text-2xl font-bold {% if bot_status == 'KILLED' %}text-red-400{% elif bot_status == 'IDLE' %}text-yellow-400{% else %}text-green-400{% endif %}">
-                {{ bot_status }}
-            </p>
+            <h3 class="text-gray-400 text-sm mb-1">Mode</h3>
+            <p class="text-2xl font-bold text-cyan-400">{{ bot.mode }}</p>
         </div>
     </div>
 
-    <!-- Kill Switch + Bot Control -->
+    <!-- Live Prices + Control -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <h2 class="text-xl font-bold mb-4">Long Straddle (Paper)</h2>
+            
+            {% if bot.ce_symbol %}
+            <p class="text-sm text-gray-400">CE: {{ bot.ce_symbol }}</p>
+            <p class="text-sm text-gray-400 mb-2">PE: {{ bot.pe_symbol }}</p>
+            <p class="text-sm">Entry Combined: <b>₹ {{ bot.entry_combined }}</b></p>
+            {% endif %}
+
+            {% if live_ce and live_pe %}
+            <p class="mt-2">Live CE: <b>₹ {{ live_ce }}</b> | Live PE: <b>₹ {{ live_pe }}</b></p>
+            <p>Live Combined: <b>₹ {{ live_ce + live_pe }}</b></p>
+            {% endif %}
+
+            {% if bot.last_event %}
+            <p class="mt-2 text-yellow-400">Last Event: {{ bot.last_event }} | PnL: ₹ {{ bot.last_pnl }}</p>
+            {% endif %}
+
+            <div class="flex gap-4 mt-6">
+                <form method="post" action="/bot/start">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-semibold">Start Paper Bot</button>
+                </form>
+                <form method="post" action="/bot/stop">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold">Stop Bot</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
             <h2 class="text-xl font-bold mb-4">Kill Switch</h2>
-            <p class="text-gray-400 mb-4">Current: <span class="font-bold {% if kill_active %}text-red-400{% else %}text-green-400{% endif %}">{{ "ACTIVE" if kill_active else "OFF" }}</span></p>
+            <p class="mb-4">Status: <span class="{% if kill_active %}text-red-400{% else %}text-green-400{% endif %} font-bold">{{ "ACTIVE" if kill_active else "OFF" }}</span></p>
             <div class="flex gap-4">
                 <form method="post" action="/kill/activate">
                     <button type="submit" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold">Activate Kill</button>
@@ -56,70 +83,31 @@
                 </form>
             </div>
         </div>
-
-        <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <h2 class="text-xl font-bold mb-4">Bot Control</h2>
-            <p class="text-gray-400 mb-4">Bot runs via terminal / cron on trading days. Use Kill Switch to stop it.</p>
-            <p class="text-sm text-yellow-400">Note: Full Start/Stop from web needs VPS with process control. Currently Kill Switch is the safe control method.</p>
-        </div>
-    </div>
-
-    <!-- Last Trade Summary -->
-    <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-        <h2 class="text-xl font-bold mb-4">Last Trade Summary</h2>
-        {% if summary %}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div><p class="text-gray-400 text-sm">Date</p><p class="font-bold">{{ summary.date }}</p></div>
-            <div><p class="text-gray-400 text-sm">Strike</p><p class="font-bold">{{ summary.strike }}</p></div>
-            <div><p class="text-gray-400 text-sm">Exit Reason</p><p class="font-bold">{{ summary.exit_reason }}</p></div>
-            <div><p class="text-gray-400 text-sm">Gross P&L</p><p class="font-bold text-green-400">₹ {{ summary.gross_pnl }}</p></div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div><p class="text-gray-400 text-sm">Net P&L (est)</p><p class="font-bold">₹ {{ summary.net_pnl_estimate }}</p></div>
-            <div><p class="text-gray-400 text-sm">Mode</p><p class="font-bold">{{ summary.mode }}</p></div>
-        </div>
-        {% else %}
-        <p class="text-gray-400">No trade summary available yet.</p>
-        {% endif %}
     </div>
 
     <!-- Positions -->
     <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-        <h2 class="text-xl font-bold mb-4">Current Positions</h2>
+        <h2 class="text-xl font-bold mb-4">Current Positions (Broker)</h2>
         {% if positions %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="text-gray-400 text-sm border-b border-gray-700">
-                    <tr>
-                        <th class="pb-3">Symbol</th>
-                        <th class="pb-3">Qty</th>
-                        <th class="pb-3">Avg</th>
-                        <th class="pb-3">LTP</th>
-                        <th class="pb-3">P&L</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in positions %}
-                    <tr class="border-b border-gray-700">
-                        <td class="py-3">{{ p.tradingsymbol }}</td>
-                        <td>{{ p.quantity }}</td>
-                        <td>{{ p.average_price }}</td>
-                        <td>{{ p.last_price }}</td>
-                        <td class="{% if p.pnl >= 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ p.pnl }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <table class="w-full text-left">
+            <thead class="text-gray-400 text-sm border-b border-gray-700">
+                <tr><th class="pb-3">Symbol</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th></tr>
+            </thead>
+            <tbody>
+                {% for p in positions %}
+                <tr class="border-b border-gray-700">
+                    <td class="py-3">{{ p.tradingsymbol }}</td>
+                    <td>{{ p.quantity }}</td>
+                    <td>{{ p.average_price }}</td>
+                    <td>{{ p.last_price }}</td>
+                    <td class="{% if p.pnl >= 0 %}text-green-400{% else %}text-red-400{% endif %}">{{ p.pnl }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         {% else %}
         <p class="text-gray-400">No open positions</p>
         {% endif %}
-    </div>
-
-    <!-- Logs -->
-    <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-        <h2 class="text-xl font-bold mb-4">Recent Logs</h2>
-        <pre class="bg-black text-green-400 p-4 rounded-lg text-sm overflow-x-auto max-h-96 overflow-y-auto">{{ logs }}</pre>
     </div>
 
 </div>
